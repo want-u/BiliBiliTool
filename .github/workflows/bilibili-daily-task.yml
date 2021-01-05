@@ -5,15 +5,17 @@ on:
   
   workflow_dispatch: # 手动触发
   schedule: # 计划任务触发
-    - cron: '11 17 * * *' 
-    # cron表达式，时区是UTC时间，比我们早8小时，要用我们的时间减去8小时后填上去，如上所表示的是每天23点5分
-    # 建议每个人都修改下时间！不要使用默认时间！最好不要设定在整点，错开峰值，避免大量G站同一个IP在相同时间去请求B站接口，导致IP被禁！
+    - cron: '0 16 * * *' 
+    # cron表达式，时区是UTC时间，比我们早8小时，如上所表示的是每天0点0分（24点整）
+    # 建议每个人通过设置 GitHub Environments 的方式来设定为自己的目标运行时间（详细设置方法见文档说明）
     
 
 jobs:
   run-bilibili-tool:
 
     runs-on: ubuntu-latest
+
+    environment: Production
 
     steps:
 
@@ -35,37 +37,58 @@ jobs:
       with:
         dotnet-version: 5.0.x
 
-    # 还原、构建、发布
+    # 发布
     - name: Publish
       run: |
-        dotnet restore
-        dotnet build --configuration Release --no-restore
         cd ./src/Ray.BiliBiliTool.Console
-        dotnet publish --self-contained false -o ./bin/Publish/net5-dependent
+        dotnet publish --configuration Release --self-contained false --output ./bin/Publish/net5-dependent
        
     # 运行
     - name: Run APP
       env:
-        Ray_BiliBiliCookie:UserId: ${{secrets.USERID}}
-        Ray_BiliBiliCookie:DedeUserID: ${{secrets.DEDEUSERID}} # 为了兼容 GitHub Secrets 经常会被填错
-        Ray_BiliBiliCookie:SessData: ${{secrets.SESSDATA}}
-        Ray_BiliBiliCookie:BiliJct: ${{secrets.BILIJCT}}
-        Ray_BiliBiliCookie:Bili_jct: ${{secrets.BILI_JCT}} # 为了兼容 GitHub Secrets 经常会被填错
-        Ray_Push:PushScKey: ${{secrets.PUSHSCKEY}}
-        Ray_Security:IsSkipDailyTask: ${{secrets.ISSKIPDAILYTASK}}
-        Ray_Security:IntervalSecondsBetweenRequestApi: ${{secrets.INTERVALSECONDSBETWEENREQUESTAPI}}
-        Ray_Security:IntervalMethodTypes: ${{secrets.INTERVALMETHODTYPES}}
-        Ray_Security:UserAgent: ${{secrets.USERAGENT}}
-        Ray_DailyTaskConfig:NumberOfCoins: ${{secrets.NUMBEROFCOINS}}
-        Ray_DailyTaskConfig:SelectLike: ${{secrets.SELECTLIKE}}
-        Ray_DailyTaskConfig:SupportUpIds: ${{secrets.SUPPORTUPIDS}}
-        Ray_DailyTaskConfig:DayOfAutoCharge: ${{secrets.DAYOFAUTOCHARGE}}
-        Ray_DailyTaskConfig:DayOfReceiveVipPrivilege: ${{secrets.DAYOFRECEIVEVIPPRIVILEGE}}
-        Ray_DailyTaskConfig:DevicePlatform: ${{secrets.DEVICEPLATFORM}}
-        Ray_Serilog:WriteTo:0:Args:restrictedToMinimumLevel: ${{secrets.CONSOLELOGLEVEL}}
-        Ray_Serilog:WriteTo:0:Args:outputTemplate: ${{secrets.CONSOLELOGTEMPLATE}} 
-        ASPNETCORE_ENVIRONMENT: ${{secrets.ENV}} # 方便切换不同的appsettings文件 也可以在不同的action yml文件中配置来同时运行多个任务
-        Ray_WebProxy: ${{secrets.PROXY}} # 代理
+        ASPNETCORE_ENVIRONMENT: ${{secrets.ENV}} # 运行环境
+        Ray_BiliBiliCookie__UserId: ${{secrets.USERID}}
+        Ray_BiliBiliCookie__DedeUserID: ${{secrets.DEDEUSERID}} # 为了兼容 GitHub Secrets 经常会被填错
+        Ray_BiliBiliCookie__SessData: ${{secrets.SESSDATA}}
+        Ray_BiliBiliCookie__BiliJct: ${{secrets.BILIJCT}}
+        Ray_BiliBiliCookie__Bili_jct: ${{secrets.BILI_JCT}} # 为了兼容 GitHub Secrets 经常会被填错
+        Ray_BiliBiliCookie__OtherCookies: ${{secrets.OTHERCOOKIES}} # 为了解决412问题
+        Ray_Serilog__WriteTo__3__Args__botToken: ${{secrets.PUSHTGTOKEN}} # Telegram
+        Ray_Serilog__WriteTo__3__Args__chatId: ${{secrets.PUSHTGCHATID}}
+        Ray_Serilog__WriteTo__3__Args__containsTrigger: ${{secrets.PUSHTGTRIGGER}}
+        Ray_Serilog__WriteTo__4__Args__webHookUrl: ${{secrets.PUSHWEIXINURL}} # 企业微信
+        Ray_Serilog__WriteTo__4__Args__containsTrigger: ${{secrets.PUSHWEIXINTRIGGER}}
+        Ray_Serilog__WriteTo__4__Args__restrictedToMinimumLevel: ${{secrets.PUSHWEIXINLEVEL}}
+        Ray_Serilog__WriteTo__5__Args__webHookUrl: ${{secrets.PUSHDINGURL}} # 钉钉
+        Ray_Serilog__WriteTo__5__Args__containsTrigger: ${{secrets.PUSHDINGTRIGGER}}
+        Ray_Serilog__WriteTo__5__Args__restrictedToMinimumLevel: ${{secrets.PUSHDINGLEVEL}}
+        Ray_Serilog__WriteTo__6__Args__scKey: ${{secrets.PUSHSCKEY}} # Server酱
+        Ray_Serilog__WriteTo__6__Args__containsTrigger: ${{secrets.PUSHSERVERTRIGGER}}
+        Ray_Serilog__WriteTo__6__Args__restrictedToMinimumLevel: ${{secrets.PUSHSERVERLEVEL}}
+        Ray_Serilog__WriteTo__7__Args__sKey: ${{secrets.PUSHCOOLSKEY}} # 酷推
+        Ray_Serilog__WriteTo__7__Args__containsTrigger: ${{secrets.PUSHCOOLTRIGGER}}
+        Ray_Serilog__WriteTo__7__Args__restrictedToMinimumLevel: ${{secrets.PUSHCOOLLEVEL}}
+        Ray_Serilog__WriteTo__8__Args__api: ${{secrets.PUSHOTHERAPI}} # 自定义api
+        Ray_Serilog__WriteTo__8__Args__placeholder: ${{secrets.PUSHOTHERPLACEHOLDER}}
+        Ray_Serilog__WriteTo__8__Args__bodyJsonTemplate: ${{secrets.PUSHOTHERBODYJSONTEMPLATE}}
+        Ray_Serilog__WriteTo__8__Args__containsTrigger: ${{secrets.PUSHOTHERTRIGGER}}
+        Ray_Serilog__WriteTo__8__Args__restrictedToMinimumLevel: ${{secrets.PUSHOTHERLEVEL}}
+        Ray_Security__IsSkipDailyTask: ${{secrets.ISSKIPDAILYTASK}}
+        Ray_Security__IntervalSecondsBetweenRequestApi: ${{secrets.INTERVALSECONDSBETWEENREQUESTAPI}}
+        Ray_Security__IntervalMethodTypes: ${{secrets.INTERVALMETHODTYPES}}
+        Ray_Security__UserAgent: ${{secrets.USERAGENT}}
+        Ray_Security__WebProxy: ${{secrets.WEBPROXY}}
+        Ray_DailyTaskConfig__NumberOfCoins: ${{secrets.NUMBEROFCOINS}}
+        Ray_DailyTaskConfig__SelectLike: ${{secrets.SELECTLIKE}}
+        Ray_DailyTaskConfig__SupportUpIds: ${{secrets.SUPPORTUPIDS}}
+        Ray_DailyTaskConfig__DayOfAutoCharge: ${{secrets.DAYOFAUTOCHARGE}}
+        Ray_DailyTaskConfig__AutoChargeUpId: ${{secrets.AUTOCHARGEUPID}}
+        Ray_DailyTaskConfig__ChargeComment: ${{secrets.CHARGECOMMENT}}
+        Ray_DailyTaskConfig__DayOfReceiveVipPrivilege: ${{secrets.DAYOFRECEIVEVIPPRIVILEGE}}
+        Ray_DailyTaskConfig__IsExchangeSilver2Coin: ${{secrets.ISEXCHANGESILVER2COIN}}
+        Ray_DailyTaskConfig__DevicePlatform: ${{secrets.DEVICEPLATFORM}}
+        Ray_Serilog__WriteTo__0__Args__restrictedToMinimumLevel: ${{secrets.CONSOLELOGLEVEL}}
+        Ray_Serilog__WriteTo__0__Args__outputTemplate: ${{secrets.CONSOLELOGTEMPLATE}} 
       run: |
         cd ./src/Ray.BiliBiliTool.Console/bin/Publish/net5-dependent
         dotnet Ray.BiliBiliTool.Console.dll -closeConsoleWhenEnd=1 ${{secrets.OTHERCONFIGS}}
