@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Ray.BiliBiliTool.Console;
 using Ray.BiliBiliTool.DomainService.Interfaces;
@@ -8,19 +9,25 @@ namespace WatchVideoTest
 {
     public class WatchVideo
     {
+        public WatchVideo()
+        {
+            Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
+            Program.PreWorks(new string[] { });
+        }
+
         [Fact]
         public void Test1()
         {
             Program.PreWorks(new string[] { });
 
-            using (var scope = RayContainer.Root.CreateScope())
+            using (var scope = Global.ServiceProviderRoot.CreateScope())
             {
-                var dailyTask = scope.ServiceProvider.GetRequiredService<IVideoDomainService>();
+                var domainService = scope.ServiceProvider.GetRequiredService<IVideoDomainService>();
                 var account = scope.ServiceProvider.GetRequiredService<IAccountDomainService>();
 
-                var dailyTaskStatus = account.GetDailyTaskStatus();
-                var aid = dailyTask.GetRandomVideoOfRegion().Item1;
-                dailyTask.WatchVideo(aid);
+                //var dailyTaskStatus = account.GetDailyTaskStatus();
+                //var aid = domainService.GetRandomVideoOfRegion().Item1;
+                domainService.WatchVideo("843414547");
 
                 Assert.True(true);
             }

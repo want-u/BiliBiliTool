@@ -20,18 +20,21 @@ namespace Ray.BiliBiliTool.DomainService
         private readonly IDailyTaskApi _dailyTaskApi;
         private readonly BiliBiliCookieOptions _biliBiliCookieOptions;
         private readonly DailyTaskOptions _dailyTaskOptions;
+        private readonly Dictionary<string, int> _expDic;
         private readonly IRelationApi _relationApi;
 
         public VideoDomainService(ILogger<VideoDomainService> logger,
             IDailyTaskApi dailyTaskApi,
             IOptionsMonitor<BiliBiliCookieOptions> biliBiliCookieOptions,
             IOptionsMonitor<DailyTaskOptions> dailyTaskOptions,
+            IOptionsMonitor<Dictionary<string, int>> dicOptions,
             IRelationApi relationApi)
         {
             _logger = logger;
             _dailyTaskApi = dailyTaskApi;
             _relationApi = relationApi;
             _biliBiliCookieOptions = biliBiliCookieOptions.CurrentValue;
+            _expDic = dicOptions.Get(Constants.OptionsNames.ExpDictionaryName);
             _dailyTaskOptions = dailyTaskOptions.CurrentValue;
         }
 
@@ -44,7 +47,7 @@ namespace Ray.BiliBiliTool.DomainService
             int[] arr = { 1, 3, 4, 5, 160, 22, 119 };
             int rid = arr[new Random().Next(arr.Length - 1)];
 
-            BiliApiResponse<List<RankingInfo>> apiResponse = _dailyTaskApi.GetRegionRankingVideos(rid, 3).Result;
+            BiliApiResponse<List<RankingInfo>> apiResponse = _dailyTaskApi.GetRegionRankingVideos(rid, 3).GetAwaiter().GetResult();
             _logger.LogDebug("获取分区:{rid}的{day}日top10榜单成功", rid, 3);
             RankingInfo data = apiResponse.Data[new Random().Next(apiResponse.Data.Count)];
 
@@ -54,7 +57,7 @@ namespace Ray.BiliBiliTool.DomainService
         public UpVideoInfo GetRandomVideoOfUp(long upId, int total)
         {
             int pageNum = new Random().Next(1, total + 1);
-            BiliApiResponse<SearchUpVideosResponse> re = _dailyTaskApi.SearchVideosByUpId(upId, 1, pageNum).Result;
+            BiliApiResponse<SearchUpVideosResponse> re = _dailyTaskApi.SearchVideosByUpId(upId, 1, pageNum).GetAwaiter().GetResult();
 
             if (re.Code != 0)
             {
@@ -72,7 +75,7 @@ namespace Ray.BiliBiliTool.DomainService
         public int GetVideoCountOfUp(long upId)
         {
             //todo:通过获取分页实现的，有待改善
-            BiliApiResponse<SearchUpVideosResponse> re = _dailyTaskApi.SearchVideosByUpId(upId, 1, 1).Result;
+            BiliApiResponse<SearchUpVideosResponse> re = _dailyTaskApi.SearchVideosByUpId(upId, 1, 1).GetAwaiter().GetResult();
             if (re.Code != 0)
             {
                 throw new Exception(re.Message);
@@ -87,9 +90,10 @@ namespace Ray.BiliBiliTool.DomainService
 
             if (!dailyTaskStatus.Watch || !dailyTaskStatus.Share)
             {
-                targetVideo = GetRandomVideoForWatch();
+                targetVideo = GetRandomVideoForWatchAndShare();
                 _logger.LogInformation("获取随机视频：{title}", targetVideo.Item2);
             }
+
             if (!dailyTaskStatus.Watch)
                 WatchVideo(targetVideo.Item1, targetVideo.Item2);
             else
@@ -106,16 +110,17 @@ namespace Ray.BiliBiliTool.DomainService
         /// </summary>
         public void WatchVideo(string aid, string title = "")
         {
-            int playedTime = new Random().Next(1, 90);
-            BiliApiResponse apiResponse = _dailyTaskApi.UploadVideoHeartbeat(aid, playedTime).Result;
+            int playedTime = new Random().Next(1, 15);
+            BiliApiResponse apiResponse = _dailyTaskApi.UploadVideoHeartbeat(aid, playedTime).GetAwaiter().GetResult();
 
             if (apiResponse.Code == 0)
             {
-                _logger.LogInformation("视频播放成功,已观看到第{playedTime}秒", playedTime);
+                _expDic.TryGetValue("每日观看视频", out int exp);
+                _logger.LogInformation("视频播放成功，已观看到第{playedTime}秒，经验+{exp} √", playedTime, exp);
             }
             else
             {
-                _logger.LogDebug("视频播放失败,原因：{msg}", apiResponse.Message);
+                _logger.LogError("视频播放失败,原因：{msg}", apiResponse.Message);
             }
         }
 
@@ -125,16 +130,16 @@ namespace Ray.BiliBiliTool.DomainService
         /// <param name="aid">视频aid</param>
         public void ShareVideo(string aid, string title = "")
         {
-            BiliApiResponse apiResponse = _dailyTaskApi.ShareVideo(aid, _biliBiliCookieOptions.BiliJct).Result;
+            BiliApiResponse apiResponse = _dailyTaskApi.ShareVideo(aid, _biliBiliCookieOptions.BiliJct).GetAwaiter().GetResult();
 
             if (apiResponse.Code == 0)
             {
-                _logger.LogInformation("视频分享成功");
+                _expDic.TryGetValue("每日观看视频", out int exp);
+                _logger.LogInformation("视频分享成功，经验+{exp} √", exp);
             }
             else
             {
-                _logger.LogInformation("视频分享失败，原因: {msg}", apiResponse.Message);
-                _logger.LogDebug("开发者提示: 如果是csrf校验失败请检查BILI_JCT参数是否正确或者失效");
+                _logger.LogError("视频分享失败，原因: {msg}", apiResponse.Message);
             }
         }
 
@@ -143,7 +148,7 @@ namespace Ray.BiliBiliTool.DomainService
         /// 获取一个视频用来观看并分享
         /// </summary>
         /// <returns></returns>
-        private Tuple<string, string> GetRandomVideoForWatch()
+        private Tuple<string, string> GetRandomVideoForWatchAndShare()
         {
             Tuple<string, string> video = GetRandomVideoOfFollowingUps();
             if (video != null) return video;
@@ -162,7 +167,7 @@ namespace Ray.BiliBiliTool.DomainService
             }
 
             //关注列表
-            BiliApiResponse<GetFollowingsResponse> result = _relationApi.GetFollowings(_biliBiliCookieOptions.UserId).Result;
+            BiliApiResponse<GetFollowingsResponse> result = _relationApi.GetFollowings(_biliBiliCookieOptions.UserId).GetAwaiter().GetResult();
             if (result.Data.Total > 0)
             {
                 Tuple<string, string> video = GetRandomVideoOfUps(result.Data.List.Select(x => x.Mid).ToList());

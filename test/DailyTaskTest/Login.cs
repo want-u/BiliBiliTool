@@ -8,17 +8,22 @@ using Ray.BiliBiliTool.Infrastructure;
 using System.Net.Http;
 using Microsoft.Extensions.Options;
 using Ray.BiliBiliTool.Config.Options;
+using System;
 
 namespace LoginTest
 {
     public class Login
     {
+        public Login()
+        {
+            Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
+            Program.PreWorks(new string[] { });
+        }
+
         [Fact]
         public void Test1()
         {
-            Program.PreWorks(new string[] { });
-
-            using (var scope = RayContainer.Root.CreateScope())
+            using (var scope = Global.ServiceProviderRoot.CreateScope())
             {
                 var dailyTask = scope.ServiceProvider.GetRequiredService<IAccountDomainService>();
 
@@ -34,7 +39,7 @@ namespace LoginTest
         {
             Program.PreWorks(new string[] { });
 
-            using (var scope = RayContainer.Root.CreateScope())
+            using (var scope = Global.ServiceProviderRoot.CreateScope())
             {
                 var httpClientFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
 
